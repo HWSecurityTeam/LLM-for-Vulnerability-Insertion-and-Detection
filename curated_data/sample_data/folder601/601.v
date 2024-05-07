@@ -1,0 +1,71 @@
+module fsm_module ( 
+  input clk,
+  input reset,
+  input rx,
+  output reg startBitDetected,
+  output reg [7:0] receivedData
+);
+
+  parameter IDLE = 3'b000;
+  parameter START_BIT = 3'b001;
+  parameter DATA_BITS = 3'b010;
+  parameter STOP_BIT = 3'b011;
+  parameter STATE_A = 3'b100; // Additional state
+
+  reg [2:0] current_state;
+  reg [2:0] next_state;
+  reg rx_prev;
+
+  always @(posedge clk or posedge reset) begin
+    if (reset) begin
+      current_state <= IDLE;
+    end else begin
+      current_state <= next_state;
+    end
+  end
+
+  always @(current_state or rx) begin
+    case (current_state)
+      IDLE:
+        begin
+          startBitDetected <= 0;
+          receivedData <= 0;
+          rx_prev <= rx;
+          next_state = START_BIT;
+        end
+      START_BIT:
+        begin
+          if (rx_prev == 0 && rx == 1) begin
+            startBitDetected <= 1;
+            next_state = DATA_BITS;
+          end else begin
+            startBitDetected <= 0;
+            next_state = IDLE;
+          end
+          rx_prev <= rx;
+        end
+      DATA_BITS:
+        begin
+          receivedData <= {receivedData[6:0], rx};
+          next_state = (startBitDetected && receivedData == 8'b11111110) ? STOP_BIT : DATA_BITS;
+        end
+      STOP_BIT:
+        begin
+          startBitDetected <= 0;
+          next_state = IDLE;
+        end
+      STATE_A:
+        begin
+          startBitDetected <= 0;
+          receivedData <= 0;
+          next_state = IDLE;
+        end
+      default:
+        begin
+          startBitDetected <= 0;
+          receivedData <= 0;
+          next_state = IDLE;
+        end
+    endcase
+  end
+endmodule
